@@ -1,7 +1,7 @@
 project "RayTracing"
    kind "ConsoleApp"
    language "C++"
-   cppdialect "C++17"
+   cppdialect "C++20"
    targetdir "bin/%{cfg.buildcfg}"
    staticruntime "off"
 
@@ -11,11 +11,12 @@ project "RayTracing"
    {
       "../Walnut/vendor/imgui",
       "../Walnut/vendor/glfw/include",
-      "../Walnut/vendor/glm",
 
-      "../Walnut/Walnut/src",
+      "../Walnut/Walnut/Source",
+      "../Walnut/Walnut/Platform/GUI",
 
       "%{IncludeDir.VulkanSDK}",
+      "../Walnut/vendor/glm"
    }
 
    links
@@ -29,6 +30,7 @@ project "RayTracing"
    filter "system:windows"
       systemversion "latest"
       defines { "WL_PLATFORM_WINDOWS" }
+      buildoptions { "/utf-8" }
 
    filter "configurations:Debug"
       defines { "WL_DEBUG" }

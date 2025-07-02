@@ -4,7 +4,11 @@ workspace "RayTracing"
    configurations { "Debug", "Release", "Dist" }
    startproject "RayTracing"
 
-outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
-include "Walnut/Build-Walnut-External.lua"
+   -- Workspace-wide build options for MSVC
+   filter "system:windows"
+      buildoptions { "/EHsc", "/Zc:preprocessor", "/Zc:__cplusplus" }
 
+outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
+
+include "Walnut/Build-Walnut-External.lua"
 include "RayTracing"
