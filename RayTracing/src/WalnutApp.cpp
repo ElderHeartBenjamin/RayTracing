@@ -56,6 +56,12 @@ namespace RayTracing {
 
                 if (ImGui::TreeNodeEx("Controls", treeNodeFlags))
                 {
+                    if (ImGui::Button("Reset"))
+                        m_Renderer.ResetFrameIndex();
+
+                    ImGui::SameLine();
+                    ImGui::Checkbox("Accumulate", &m_Renderer.GetSettings().Accumulate);
+
                     float cameraSpeed = m_Camera.GetSpeed();
                     if (ImGui::DragFloat("Camera speed", &cameraSpeed, 0.1f, 0.1f, 10.0f)
                         && cameraSpeed >= 0.1f && cameraSpeed <= 10.0f)
@@ -128,7 +134,9 @@ namespace RayTracing {
 
         virtual void OnUpdate(float ts)
         {
-            m_Camera.OnUpdate(ts);
+            if (m_Camera.OnUpdate(ts))
+                m_Renderer.ResetFrameIndex();
+
             Render();
         }
 

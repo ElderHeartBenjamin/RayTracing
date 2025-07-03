@@ -1,6 +1,10 @@
 #include "Renderer.h"
 
+#include <execution>
+
 namespace RayTracing {
+
+#define RT_ENABLE_MT 1
 
     namespace Utils {
 
@@ -38,6 +42,16 @@ namespace RayTracing {
 
         delete[] m_ImageData;
         m_ImageData = new uint32_t[width * height];
+
+        delete[] m_AccumulationData;
+        m_AccumulationData = new glm::vec4[width * height];
+
+        m_ImageHorizontalIter.resize(width);
+        m_ImageVerticaltalIter.resize(height);
+        for (uint32_t i = 0; i < width; i++)
+            m_ImageHorizontalIter[i] = i;
+        for (uint32_t i = 0; i < height; i++)
+            m_ImageVerticaltalIter[i] = i;
     }
 
     void Renderer::Render(const Scene& scene, const Camera& camera)
@@ -45,9 +59,26 @@ namespace RayTracing {
         if (!m_FinalImage->GetWidth() || !m_FinalImage->GetHeight())
             return;
 
+        if (m_FrameIndex == 1)
+            memset(m_AccumulationData, 0, m_FinalImage->GetWidth() * m_FinalImage->GetHeight() * sizeof(glm::vec4));
+
         m_ActiveScene = &scene;
         m_ActiveCamera = &camera;
 
+#if RT_ENABLE_MT
+        std::for_each(std::execution::par, m_ImageVerticaltalIter.begin(), m_ImageVerticaltalIter.end(), [this](uint32_t y)
+        {
+            std::for_each(std::execution::par, m_ImageHorizontalIter.begin(), m_ImageHorizontalIter.end(), [this, y](uint32_t x)
+            {
+                glm::vec4 color = PerPixel(x, y);
+                m_AccumulationData[x + y * m_FinalImage->GetWidth()] += color;
+
+                glm::vec4 accumulateColor = m_AccumulationData[x + y * m_FinalImage->GetWidth()] / (float)m_FrameIndex;
+                accumulateColor = glm::clamp(accumulateColor, glm::vec4(0.0f), glm::vec4(1.0f));
+                m_ImageData[x + y * m_FinalImage->GetWidth()] = Utils::ConvertToRGBA(accumulateColor);
+            });
+        });
+#else
         for (uint32_t y = 0; y < m_FinalImage->GetHeight(); y++)
         {
             for (uint32_t x = 0; x < m_FinalImage->GetWidth(); x++)
@@ -57,6 +88,12 @@ namespace RayTracing {
                 m_ImageData[x + y * m_FinalImage->GetWidth()] = Utils::ConvertToRGBA(color);
             }
         }
+#endif
+
+        if (m_Settings.Accumulate)
+            m_FrameIndex++;
+        else
+            m_FrameIndex = 1;
 
         m_FinalImage->SetData(m_ImageData);
     }

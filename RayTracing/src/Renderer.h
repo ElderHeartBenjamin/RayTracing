@@ -14,13 +14,20 @@ namespace RayTracing {
     class Renderer
     {
     public:
+        struct Settings
+        {
+            bool Accumulate = true;
+        };
+    public:
         Renderer() = default;
         ~Renderer();
 
         void OnResize(uint32_t width, uint32_t height);
         void Render(const Scene& scene, const Camera& camera);
+        void ResetFrameIndex() { m_FrameIndex = 1; }
 
         std::shared_ptr<Walnut::Image> GetFinalImage() const { return m_FinalImage; }
+        Settings& GetSettings() { return m_Settings; }
     private:
         struct HitPayload
         {
@@ -36,11 +43,18 @@ namespace RayTracing {
         HitPayload ClosestHit(const Ray& ray, float hitDistance, int objectIndex);
         HitPayload Miss(const Ray& ray);
     private:
-        const Scene* m_ActiveScene = nullptr;
-        const Camera* m_ActiveCamera = nullptr;
+        Settings m_Settings;
+        std::shared_ptr<Walnut::Image> m_FinalImage;
 
         uint32_t* m_ImageData = nullptr;
-        std::shared_ptr<Walnut::Image> m_FinalImage;
+        glm::vec4* m_AccumulationData = nullptr;
+        std::vector<uint32_t> m_ImageHorizontalIter;
+        std::vector<uint32_t> m_ImageVerticaltalIter;
+
+        uint32_t m_FrameIndex = 1;
+
+        const Scene* m_ActiveScene = nullptr;
+        const Camera* m_ActiveCamera = nullptr;
     };
 
 }
