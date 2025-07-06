@@ -17,13 +17,16 @@ namespace RayTracing {
         RayTracingLayer()
             : m_Camera(45.0f, 0.1f, 1000.0f) 
         {
-            Material& pinkMaterial = m_Scene.Materials.emplace_back();
-            pinkMaterial.Albedo = { 1.0f, 0.0f, 1.0f };
-            pinkMaterial.Roughness = 0.0f;
+            Material& Material1 = m_Scene.Materials.emplace_back();
+            Material1.Albedo = { 1.0f, 1.0f, 1.0f };
+            Material1.Roughness = 0.3f;
 
-            Material& blueMaterial = m_Scene.Materials.emplace_back();
-            blueMaterial.Albedo = { 0.2f, 0.3f, 1.0f };
-            blueMaterial.Roughness = 0.1f;
+            Material& Material2 = m_Scene.Materials.emplace_back();
+            Material2.Albedo = { 0.95f, 0.89f, 0.89f };
+            Material2.Roughness = 1.0f;
+
+            Material& emissiveMaterial = m_Scene.Materials.emplace_back();
+            emissiveMaterial.EmissionStrength = 0.5f;
 
             {
                 Sphere sphere;
@@ -35,9 +38,25 @@ namespace RayTracing {
 
             {
                 Sphere sphere;
+                sphere.Position = { 2.5f, 0.0f, 0.0f };
+                sphere.Radius = 1.0f;
+                sphere.MaterialIndex = 1;
+                m_Scene.Spheres.emplace_back(sphere);
+            }
+
+            {
+                Sphere sphere;
                 sphere.Position = { 0.0f, -101.0f, 0.0f };
                 sphere.Radius = 100.0f;
                 sphere.MaterialIndex = 1;
+                m_Scene.Spheres.emplace_back(sphere);
+            }
+
+            {
+                Sphere sphere;
+                sphere.Position = { 5.0f, 0.0f, 16.0f };
+                sphere.Radius = 11.0f;
+                sphere.MaterialIndex = 2;
                 m_Scene.Spheres.emplace_back(sphere);
             }
         }
@@ -51,6 +70,7 @@ namespace RayTracing {
                 if (ImGui::TreeNodeEx("Statistics", treeNodeFlags))
                 {
                     ImGui::Text("Last render: %.3fms", m_LastRenderTime);
+                    ImGui::Text("FPS: %.1f", 1000.0f / m_LastRenderTime);
                     ImGui::TreePop();
                 }
 
@@ -84,9 +104,9 @@ namespace RayTracing {
                         Sphere& sphere = m_Scene.Spheres[i];
 
                         ImGui::PushID((int)i);
-                        ImGui::DragFloat3("Position", glm::value_ptr(sphere.Position), 0.1f);
-                        ImGui::DragFloat("Radius", &sphere.Radius, 0.1f);
-                        ImGui::DragInt("Material Index", &sphere.MaterialIndex, 1.0f, 0, (int)m_Scene.Materials.size() - 1);
+                        m_Modified |= ImGui::DragFloat3("Position", glm::value_ptr(sphere.Position), 0.1f);
+                        m_Modified |= ImGui::DragFloat("Radius", &sphere.Radius, 0.1f);
+                        m_Modified |= ImGui::DragInt("Material Index", &sphere.MaterialIndex, 1.0f, 0, (int)m_Scene.Materials.size() - 1);
 
                         ImGui::Separator();
                         ImGui::Separator();
@@ -103,8 +123,10 @@ namespace RayTracing {
                         Material& material = m_Scene.Materials[i];
 
                         ImGui::PushID((int)i);
-                        ImGui::ColorEdit3("Albedo", glm::value_ptr(material.Albedo));
-                        ImGui::DragFloat("Roughness", &material.Roughness, 0.01f, 0.0f, 1.0f);
+                        m_Modified |= ImGui::ColorEdit3("Albedo", glm::value_ptr(material.Albedo));
+                        m_Modified |= ImGui::ColorEdit3("Emission Color", glm::value_ptr(material.EmissionColor));
+                        m_Modified |= ImGui::DragFloat("Emission Strength", &material.EmissionStrength);
+                        m_Modified |= ImGui::DragFloat("Roughness", &material.Roughness, 0.01f, 0.0f, 1.0f);
 
                         ImGui::Separator();
                         ImGui::Separator();
@@ -134,10 +156,11 @@ namespace RayTracing {
 
         virtual void OnUpdate(float ts)
         {
-            if (m_Camera.OnUpdate(ts))
+            if (m_Camera.OnUpdate(ts) || m_Modified)
                 m_Renderer.ResetFrameIndex();
 
             Render();
+            m_Modified = false;
         }
 
         void Render()
@@ -156,6 +179,7 @@ namespace RayTracing {
         Renderer m_Renderer;
 
         float m_LastRenderTime = 0.0f;
+        bool m_Modified = false;
         uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
     };
 

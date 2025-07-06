@@ -9,6 +9,9 @@ namespace RayTracing {
     {
         glm::vec3 Albedo{1.0f};
         float Roughness = 1.0f;
+
+        glm::vec3 EmissionColor{1.0f};
+        float EmissionStrength = 0.0f;
     };
 
     struct Sphere

@@ -8,6 +8,29 @@ namespace RayTracing {
 
     namespace Utils {
 
+        static float FastRandom(uint32_t& state)
+        {
+            state = state * 747796405 + 2891336453;
+            uint32_t result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
+            result = (result >> 22) ^ result;
+            return (float)result / 4294967295.0f;
+        }
+
+        static float RandomValueNormalDistribution(uint32_t& state)
+        {
+            float theta = 2 * 3.1415926f * FastRandom(state);
+            float rho = glm::sqrt(-2 * glm::log(FastRandom(state)));
+            return rho * glm::cos(theta);
+        }
+
+        static glm::vec3 RandomDirection(uint32_t& state)
+        {
+            float x = RandomValueNormalDistribution(state);
+            float y = RandomValueNormalDistribution(state);
+            float z = RandomValueNormalDistribution(state);
+            return glm::normalize(glm::vec3(x, y, z));
+        }
+
         static uint32_t ConvertToRGBA(const glm::vec4& color)
         {
             uint8_t r = (uint8_t)(color.r * 255.0f);
@@ -104,35 +127,40 @@ namespace RayTracing {
         ray.Origin = m_ActiveCamera->GetPosition();
         ray.Direction = m_ActiveCamera->GetRayDirections()[x + y * m_FinalImage->GetWidth()];
 
-        glm::vec3 color = glm::vec3(0.0f);
-        glm::vec3 skyColor = glm::vec3(0.6f, 0.7f, 0.9f);
-        float multiplier = 1.0f;
+        glm::vec3 color = glm::vec3(1.0f);
+        glm::vec3 incomingLight = glm::vec3(0.0f);
+
+        uint32_t seed = x + y * m_FinalImage->GetWidth();
+        seed *= m_FrameIndex;
 
         int bounces = 5;
         for (int i = 0; i < bounces; i++)
         {
+            seed += i;
+
             HitPayload payload = TraceRay(ray);
-            if (payload.HitDistance < 0.0f)
+            if (payload.HitDistance >= 0.0f)
             {
-                color += skyColor * multiplier;
+                const Sphere& closestSphere = m_ActiveScene->Spheres[payload.ObjectIndex];
+                const Material& material = m_ActiveScene->Materials[closestSphere.MaterialIndex];
+
+                ray.Origin = payload.WorldPosition + payload.WorldNormal * 0.0001f; // Moving out little bit
+                glm::vec3 diffuseDir = glm::normalize(payload.WorldNormal + Utils::RandomDirection(seed));
+                glm::vec3 reflectDir = glm::reflect(ray.Direction, payload.WorldNormal);
+                ray.Direction = glm::normalize(glm::mix(reflectDir, diffuseDir, material.Roughness));
+
+                incomingLight += (material.EmissionColor * material.EmissionStrength) * color;
+                color *= material.Albedo;
+            }
+            else
+            {
+                glm::vec3 skyColor = glm::vec3(0.6f, 0.7f, 0.9f);
+                incomingLight += skyColor * color;
                 break;
             }
-
-            glm::vec3 lightDir = glm::normalize(glm::vec3(-1.0f, -1.0f, -1.0f));
-            float lightIntensity = glm::max(glm::dot(payload.WorldNormal, -lightDir), 0.0f);
-
-            const Sphere& closestSphere = m_ActiveScene->Spheres[payload.ObjectIndex];
-            const Material& material = m_ActiveScene->Materials[closestSphere.MaterialIndex];
-            glm::vec3 sphereColor = material.Albedo;
-            sphereColor = sphereColor * lightIntensity;
-            color += sphereColor * multiplier;
-            multiplier *= 0.5f;
-
-            ray.Origin = payload.WorldPosition + payload.WorldNormal * 0.0001f; // Moving out little bit
-            ray.Direction = glm::reflect(ray.Direction, payload.WorldNormal + material.Roughness * Walnut::Random::Vec3(-0.5f, 0.5f));
         }
 
-        return glm::vec4(color, 1.0f);
+        return glm::vec4(incomingLight, 1.0f);
     }
 
     Renderer::HitPayload Renderer::TraceRay(const Ray& ray)
@@ -162,10 +190,10 @@ namespace RayTracing {
             if (discriminant < 0) 
                 continue;
 
-            // float t0 = (-b + glm::sqrt(discriminant)) / (a * 2.0f);
+            float t0 = (-b + glm::sqrt(discriminant)) / (a * 2.0f);
             float t1 = (-b - glm::sqrt(discriminant)) / (a * 2.0f);
 
-            if (t1 > 0.0f && t1 < hitDistance)
+            if (t1 > 0.0f && t1 < hitDistance) 
             {
                 hitDistance = t1;
                 closestSphere = (int)i;
@@ -185,11 +213,8 @@ namespace RayTracing {
         payload.ObjectIndex = objectIndex;
 
         const Sphere& closestSphere = m_ActiveScene->Spheres[objectIndex];
-        glm::vec3 origin = ray.Origin - closestSphere.Position;
-        payload.WorldPosition = origin + ray.Direction * hitDistance;
-        payload.WorldNormal = glm::normalize(payload.WorldPosition);
-
-        payload.WorldPosition += closestSphere.Position; // Move it back to where it was since we did the subtraction above
+        payload.WorldPosition = ray.Origin + ray.Direction * hitDistance;
+        payload.WorldNormal = glm::normalize(payload.WorldPosition - closestSphere.Position);
         return payload;
     }
 
